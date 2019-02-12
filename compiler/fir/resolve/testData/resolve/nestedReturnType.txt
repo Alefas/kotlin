@@ -1,0 +1,14 @@
+FILE: nestedReturnType.kt
+    public final class Some {
+        public constructor(): super<R|kotlin/Any|>()
+
+        public final class Nested {
+            public constructor(): super<R|kotlin/Any|>()
+
+        }
+
+        public final function foo(): R|Some.Nested| {
+            return@@@foo <Unresolved name: Nested>#()
+        }
+
+    }
