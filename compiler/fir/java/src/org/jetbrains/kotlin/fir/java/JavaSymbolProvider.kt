@@ -204,26 +204,32 @@ class JavaSymbolProvider(
             val callableSymbols = mutableListOf<ConeCallableSymbol>()
             findClass(classId)?.let { javaClass ->
                 if (firClass.declarations.isEmpty()) {
+                    // TODO: fields
                     for (javaMethod in javaClass.methods) {
+                        if (javaMethod.isStatic) continue // TODO: statics
                         val methodName = javaMethod.name
                         val methodId = CallableId(callableId.packageName, callableId.className, methodName)
                         val methodSymbol = FirFunctionSymbol(methodId)
+                        val returnType = javaMethod.returnType
                         val memberFunction = FirMemberFunctionImpl(
                             session, null, methodSymbol, methodName,
                             javaMethod.visibility, javaMethod.modality,
                             isExpect = false, isActual = false, isOverride = false,
                             isOperator = true, isInfix = false, isInline = false,
                             isTailRec = false, isExternal = false, isSuspend = false,
-                            receiverTypeRef = null, returnTypeRef = javaMethod.returnType.toFirResolvedTypeRef()
+                            // TODO: special Java type references should be in use
+                            receiverTypeRef = null, returnTypeRef = returnType.toFirResolvedTypeRef()
                         ).apply {
                             for (typeParameter in javaMethod.typeParameters) {
                                 typeParameters += createTypeParameterSymbol(typeParameter.name).fir
                             }
                             addAnnotationsFrom(javaMethod)
                             for (valueParameter in javaMethod.valueParameters) {
+                                val parameterType = valueParameter.type
                                 valueParameters += FirValueParameterImpl(
                                     session, null, valueParameter.name ?: Name.special("<anonymous Java parameter>"),
-                                    returnTypeRef = valueParameter.type.toFirResolvedTypeRef(),
+                                    // TODO: special Java type references should be in use
+                                    returnTypeRef = parameterType.toFirResolvedTypeRef(),
                                     defaultValue = null, isCrossinline = false, isNoinline = false,
                                     isVararg = valueParameter.isVararg
                                 )
