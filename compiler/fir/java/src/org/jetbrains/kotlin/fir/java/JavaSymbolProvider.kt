@@ -49,13 +49,17 @@ class JavaSymbolProvider(
 
     private val facade: KotlinJavaPsiFacade get() = KotlinJavaPsiFacade.getInstance(project)
 
+    private val symbolProvider by lazy { session.service<FirSymbolProvider>() }
+
     private fun JavaAnnotation.toFirAnnotationCall(): FirAnnotationCall {
+        val annotationClassSymbol = classId?.let { symbolProvider.getClassLikeSymbolByFqName(it) }
         return FirAnnotationCallImpl(
             session, psi = null, useSiteTarget = null,
             annotationTypeRef = FirResolvedTypeRefImpl(
                 session = session,
                 psi = null,
-                type = ConeClassTypeImpl(FirClassSymbol(classId!!), emptyArray(), isNullable = false),
+                type = annotationClassSymbol?.let { ConeClassTypeImpl(it, emptyArray(), isNullable = false) }
+                    ?: ConeClassErrorType("Cannot get class like symbol for annotation $classId"),
                 isMarkedNullable = true,
                 annotations = emptyList()
             )

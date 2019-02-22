@@ -7,6 +7,7 @@ package org.jetbrains.kotlin.fir.java
 
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
+import org.jetbrains.kotlin.fir.java.transformers.FirJavaTypeEnhancementTransformer
 import org.jetbrains.kotlin.load.java.AnnotationTypeQualifierResolver
 import org.jetbrains.kotlin.load.java.lazy.JavaTypeQualifiersByElementType
 import org.jetbrains.kotlin.load.java.lazy.NullabilityQualifierWithApplicability
@@ -26,7 +27,7 @@ class FirJavaEnhancementContext private constructor(
 
 fun extractDefaultNullabilityQualifier(
     typeQualifierResolver: FirAnnotationTypeQualifierResolver,
-    signatureEnhancement: FirSignatureEnhancement,
+    signatureEnhancement: FirJavaTypeEnhancementTransformer,
     annotationCall: FirAnnotationCall
 ): NullabilityQualifierWithApplicability? {
     typeQualifierResolver.resolveQualifierBuiltInDefaultAnnotation(annotationCall)?.let { return it }
@@ -52,7 +53,7 @@ fun extractDefaultNullabilityQualifier(
 
 fun FirJavaEnhancementContext.computeNewDefaultTypeQualifiers(
     typeQualifierResolver: FirAnnotationTypeQualifierResolver,
-    signatureEnhancement: FirSignatureEnhancement,
+    signatureEnhancement: FirJavaTypeEnhancementTransformer,
     additionalAnnotations: List<FirAnnotationCall>
 ): JavaTypeQualifiersByElementType? {
     if (typeQualifierResolver.disabled) return defaultTypeQualifiers
@@ -85,7 +86,7 @@ fun FirJavaEnhancementContext.computeNewDefaultTypeQualifiers(
 
 fun FirJavaEnhancementContext.copyWithNewDefaultTypeQualifiers(
     typeQualifierResolver: FirAnnotationTypeQualifierResolver,
-    signatureEnhancement: FirSignatureEnhancement,
+    signatureEnhancement: FirJavaTypeEnhancementTransformer,
     additionalAnnotations: List<FirAnnotationCall>
 ): FirJavaEnhancementContext =
     when {

@@ -15,7 +15,9 @@ class FirTotalResolveTransformerWithJava : FirTotalResolveTransformer() {
         val sessions = files.mapTo(linkedSetOf()) { it.session }
         for (session in sessions) {
             if (session is FirSessionWithTransformation) {
-                session.launchTransformation(FirJavaTypeEnhancementTransformer(), null) { provider -> provider is JavaSymbolProvider }
+                session.launchTransformation(FirJavaTypeEnhancementTransformer(session), null) { provider ->
+                    provider is JavaSymbolProvider
+                }
             }
         }
     }

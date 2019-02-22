@@ -10,6 +10,7 @@ import org.jetbrains.kotlin.fir.declarations.FirValueParameter
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationContainer
 import org.jetbrains.kotlin.fir.expressions.resolvedFqName
+import org.jetbrains.kotlin.fir.java.transformers.FirJavaTypeEnhancementTransformer
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.load.java.AnnotationTypeQualifierResolver
@@ -18,7 +19,6 @@ import org.jetbrains.kotlin.load.java.READ_ONLY_ANNOTATIONS
 import org.jetbrains.kotlin.load.java.typeEnhancement.*
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.FqNameUnsafe
-import org.jetbrains.kotlin.utils.Jsr305State
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
 
 internal class EnhancementSignatureParts(
@@ -28,8 +28,7 @@ internal class EnhancementSignatureParts(
     private val fromOverridden: Collection<FirResolvedTypeRef>,
     private val isCovariant: Boolean,
     private val context: FirJavaEnhancementContext,
-    private val containerApplicabilityType: AnnotationTypeQualifierResolver.QualifierApplicabilityType,
-    private val jsr305State: Jsr305State
+    private val containerApplicabilityType: AnnotationTypeQualifierResolver.QualifierApplicabilityType
 ) {
     private val isForVarargParameter get() = typeContainer.safeAs<FirValueParameter>()?.isVararg == true
 
@@ -40,9 +39,9 @@ internal class EnhancementSignatureParts(
     //private fun FirResolvedTypeRef.unwrapEnhancement(): FirResolvedTypeRef = this
 
     internal fun enhance(
-        signatureEnhancement: FirSignatureEnhancement,
+        signatureEnhancement: FirJavaTypeEnhancementTransformer,
         predefined: TypeEnhancementInfo? = null
-    ): FirSignatureEnhancement.PartEnhancementResult {
+    ): FirJavaTypeEnhancementTransformer.PartEnhancementResult {
         val qualifiers = computeIndexedQualifiersForOverride(signatureEnhancement)
 
         val qualifiersWithPredefined: ((Int) -> JavaTypeQualifiers)? = predefined?.let {
@@ -59,9 +58,9 @@ internal class EnhancementSignatureParts(
 
         val enhancedCurrent = current.enhance(qualifiersWithPredefined ?: qualifiers)
         return if (enhancedCurrent !== current)
-            FirSignatureEnhancement.PartEnhancementResult(enhancedCurrent, wereChanges = true, containsFunctionN = containsFunctionN)
+            FirJavaTypeEnhancementTransformer.PartEnhancementResult(enhancedCurrent, wereChanges = true, containsFunctionN = containsFunctionN)
         else
-            FirSignatureEnhancement.PartEnhancementResult(current, wereChanges = false, containsFunctionN = containsFunctionN)
+            FirJavaTypeEnhancementTransformer.PartEnhancementResult(current, wereChanges = false, containsFunctionN = containsFunctionN)
     }
 
     private fun ConeKotlinType.contains(isSpecialType: (ConeClassLikeType) -> Boolean): Boolean {
@@ -74,7 +73,7 @@ internal class EnhancementSignatureParts(
 
     private fun FirResolvedTypeRef.toIndexed(
         typeQualifierResolver: FirAnnotationTypeQualifierResolver,
-        signatureEnhancement: FirSignatureEnhancement,
+        signatureEnhancement: FirJavaTypeEnhancementTransformer,
         context: FirJavaEnhancementContext
     ): List<TypeAndDefaultQualifiers> {
         val list = ArrayList<TypeAndDefaultQualifiers>(1)
@@ -140,7 +139,7 @@ internal class EnhancementSignatureParts(
     private fun FirResolvedTypeRef.extractQualifiersFromAnnotations(
         isHeadTypeConstructor: Boolean,
         defaultQualifiersForType: JavaTypeQualifiers?,
-        signatureEnhancement: FirSignatureEnhancement
+        signatureEnhancement: FirJavaTypeEnhancementTransformer
     ): JavaTypeQualifiers {
         val composedAnnotation =
             if (isHeadTypeConstructor && typeContainer != null)
@@ -189,6 +188,7 @@ internal class EnhancementSignatureParts(
     }
 
     private fun FirResolvedTypeRef.computeQualifiersForOverride(
+        signatureEnhancement: FirJavaTypeEnhancementTransformer,
         fromSupertypes: Collection<ConeKotlinType>,
         defaultQualifiersForType: JavaTypeQualifiers?,
         isHeadTypeConstructor: Boolean
@@ -200,7 +200,7 @@ internal class EnhancementSignatureParts(
             .mapNotNull { it.type.extractQualifiers().nullability }
             .toSet()
 
-        val own = extractQualifiersFromAnnotations(isHeadTypeConstructor, defaultQualifiersForType, FirSignatureEnhancement(jsr305State))
+        val own = extractQualifiersFromAnnotations(isHeadTypeConstructor, defaultQualifiersForType, signatureEnhancement)
         val ownNullability = own.takeIf { !it.isNullabilityQualifierForWarning }?.nullability
         val ownNullabilityForWarning = own.nullability
 
@@ -235,7 +235,7 @@ internal class EnhancementSignatureParts(
     }
 
     private fun computeIndexedQualifiersForOverride(
-        signatureEnhancement: FirSignatureEnhancement
+        signatureEnhancement: FirJavaTypeEnhancementTransformer
     ): (Int) -> JavaTypeQualifiers {
         val indexedFromSupertypes = fromOverridden.map { it.toIndexed(typeQualifierResolver, signatureEnhancement, context) }
         val indexedThisType = current.toIndexed(typeQualifierResolver, signatureEnhancement, context)
@@ -256,7 +256,7 @@ internal class EnhancementSignatureParts(
             val verticalSlice = indexedFromSupertypes.mapNotNull { it.getOrNull(index)?.type?.type }
 
             // Only the head type constructor is safely co-variant
-            qualifiers.computeQualifiersForOverride(verticalSlice, defaultQualifiers, isHeadTypeConstructor)
+            qualifiers.computeQualifiersForOverride(signatureEnhancement, verticalSlice, defaultQualifiers, isHeadTypeConstructor)
         }
 
         return { index -> computedResult.getOrElse(index) { JavaTypeQualifiers.NONE } }
