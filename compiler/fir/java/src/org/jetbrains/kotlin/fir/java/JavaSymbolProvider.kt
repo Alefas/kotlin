@@ -9,11 +9,16 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirNamedFunction
-import org.jetbrains.kotlin.fir.declarations.impl.*
+import org.jetbrains.kotlin.fir.declarations.impl.FirModifiableClass
+import org.jetbrains.kotlin.fir.declarations.impl.FirTypeParameterImpl
 import org.jetbrains.kotlin.fir.expressions.FirAnnotationCall
 import org.jetbrains.kotlin.fir.expressions.FirArrayOfCall
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.impl.*
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaClass
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter
+import org.jetbrains.kotlin.fir.java.types.FirJavaTypeRef
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReferenceImpl
 import org.jetbrains.kotlin.fir.resolve.AbstractFirSymbolProvider
@@ -139,24 +144,18 @@ class JavaSymbolProvider(
         }
     }
 
-    private fun flexibleType(create: (isNullable: Boolean) -> ConeKotlinType): ConeFlexibleType {
-        return ConeFlexibleType(create(false), create(true))
-    }
-
     private fun JavaClassifierType.toFirResolvedTypeRef(): FirResolvedTypeRef {
         val coneType = when (val classifier = classifier) {
             is JavaClass -> {
                 val symbol = session.service<FirSymbolProvider>().getClassLikeSymbolByFqName(classifier.classId!!) as? ConeClassSymbol
                 if (symbol == null) ConeKotlinErrorType("Symbol not found, for `${classifier.classId}`")
-                else flexibleType { isNullable ->
-                    ConeClassTypeImpl(symbol, typeArguments.map { it.toConeProjection() }.toTypedArray(), isNullable)
-                }
+                else ConeClassTypeImpl(symbol, typeArguments.map { it.toConeProjection() }.toTypedArray(), isNullable = false)
             }
             is JavaTypeParameter -> {
                 // TODO: it's unclear how to identify type parameter by the symbol
                 // TODO: some type parameter cache (provider?)
                 val symbol = createTypeParameterSymbol(classifier.name)
-                flexibleType { isNullable -> ConeTypeParameterTypeImpl(symbol, isNullable) }
+                ConeTypeParameterTypeImpl(symbol, isNullable = false)
             }
             else -> ConeClassErrorType(reason = "Unexpected classifier: $classifier")
         }
@@ -164,6 +163,11 @@ class JavaSymbolProvider(
             session, psi = null, type = coneType,
             isMarkedNullable = false, annotations = annotations.map { it.toFirAnnotationCall() }
         )
+    }
+
+    private fun JavaType.toFirJavaTypeRef(): FirJavaTypeRef {
+        val annotations = (this as? JavaClassifierType)?.annotations.orEmpty()
+        return FirJavaTypeRef(session, annotations = annotations.map { it.toFirAnnotationCall() }, type = this)
     }
 
     private fun JavaType.toFirResolvedTypeRef(): FirResolvedTypeRef {
@@ -211,14 +215,10 @@ class JavaSymbolProvider(
                         val methodId = CallableId(callableId.packageName, callableId.className, methodName)
                         val methodSymbol = FirFunctionSymbol(methodId)
                         val returnType = javaMethod.returnType
-                        val memberFunction = FirMemberFunctionImpl(
-                            session, null, methodSymbol, methodName,
+                        val memberFunction = FirJavaMethod(
+                            session, methodSymbol, methodName,
                             javaMethod.visibility, javaMethod.modality,
-                            isExpect = false, isActual = false, isOverride = false,
-                            isOperator = true, isInfix = false, isInline = false,
-                            isTailRec = false, isExternal = false, isSuspend = false,
-                            // TODO: special Java type references should be in use
-                            receiverTypeRef = null, returnTypeRef = returnType.toFirResolvedTypeRef()
+                            returnTypeRef = returnType.toFirJavaTypeRef()
                         ).apply {
                             for (typeParameter in javaMethod.typeParameters) {
                                 typeParameters += createTypeParameterSymbol(typeParameter.name).fir
@@ -226,11 +226,9 @@ class JavaSymbolProvider(
                             addAnnotationsFrom(javaMethod)
                             for (valueParameter in javaMethod.valueParameters) {
                                 val parameterType = valueParameter.type
-                                valueParameters += FirValueParameterImpl(
-                                    session, null, valueParameter.name ?: Name.special("<anonymous Java parameter>"),
-                                    // TODO: special Java type references should be in use
-                                    returnTypeRef = parameterType.toFirResolvedTypeRef(),
-                                    defaultValue = null, isCrossinline = false, isNoinline = false,
+                                valueParameters += FirJavaValueParameter(
+                                    session, valueParameter.name ?: Name.special("<anonymous Java parameter>"),
+                                    returnTypeRef = parameterType.toFirJavaTypeRef(),
                                     isVararg = valueParameter.isVararg
                                 )
                             }
@@ -262,13 +260,10 @@ class JavaSymbolProvider(
             }
         }) { firSymbol, foundClass ->
             foundClass?.let { javaClass ->
-                FirClassImpl(
-                    session, null, firSymbol as FirClassSymbol, javaClass.name,
+                FirJavaClass(
+                    session, firSymbol as FirClassSymbol, javaClass.name,
                     javaClass.visibility, javaClass.modality,
-                    isExpect = false, isActual = false,
-                    classKind = javaClass.classKind,
-                    isInner = !javaClass.isStatic, isCompanion = false,
-                    isData = false, isInline = false
+                    javaClass.classKind, javaClass.isStatic
                 ).apply {
                     for (typeParameter in javaClass.typeParameters) {
                         typeParameters += createTypeParameterSymbol(typeParameter.name).fir
