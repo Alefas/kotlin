@@ -17,9 +17,13 @@ import org.jetbrains.kotlin.fir.dependenciesWithoutSelf
 import org.jetbrains.kotlin.fir.java.FirJavaModuleBasedSession
 import org.jetbrains.kotlin.fir.java.FirLibrarySession
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider
+import org.jetbrains.kotlin.fir.java.JavaSymbolProvider
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaClass
+import org.jetbrains.kotlin.fir.java.transformers.FirTotalResolveTransformerWithJava
 import org.jetbrains.kotlin.fir.resolve.FirProvider
+import org.jetbrains.kotlin.fir.resolve.FirSymbolProvider
+import org.jetbrains.kotlin.fir.resolve.impl.FirCompositeSymbolProvider
 import org.jetbrains.kotlin.fir.resolve.impl.FirProviderImpl
-import org.jetbrains.kotlin.fir.resolve.transformers.FirTotalResolveTransformer
 import org.jetbrains.kotlin.fir.service
 import org.jetbrains.kotlin.idea.KotlinFileType
 import org.jetbrains.kotlin.idea.caches.project.IdeaModuleInfo
@@ -64,9 +68,11 @@ abstract class AbstractFirMultiModuleResolveTest : AbstractMultiModuleTest() {
 
     private fun doFirResolveTest(dirPath: String) {
         val firFiles = mutableListOf<FirFile>()
+        val sessions = mutableListOf<FirJavaModuleBasedSession>()
         val provider = FirProjectSessionProvider(project)
         for (module in project.allModules().drop(1)) {
             val session = createSession(module, provider)
+            sessions += session
 
             val builder = RawFirBuilder(session, stubMode = false)
             val psiManager = PsiManager.getInstance(project)
@@ -105,12 +111,28 @@ abstract class AbstractFirMultiModuleResolveTest : AbstractMultiModuleTest() {
             return result!!
         }
 
-        val transformer = FirTotalResolveTransformer()
+        val transformer = FirTotalResolveTransformerWithJava()
         for (file in firFiles) {
             transformer.processFile(file)
             val firFileDump = StringBuilder().also { file.accept(FirRenderer(it), null) }.toString()
             val expectedPath = expectedTxtPath((file.psi as PsiFile).virtualFile)
             KotlinTestUtils.assertEqualsToFile(File(expectedPath), firFileDump)
+        }
+        val processedJavaClasses = mutableSetOf<FirJavaClass>()
+        val javaFirDump = StringBuilder().also { builder ->
+            val renderer = FirRenderer(builder)
+            for (session in sessions) {
+                val symbolProvider = session.service<FirSymbolProvider>() as FirCompositeSymbolProvider
+                val javaProvider = symbolProvider.providers.filterIsInstance<JavaSymbolProvider>().first()
+                for (javaClass in javaProvider.getJavaTopLevelClasses().sortedBy { it.name }) {
+                    if (javaClass !is FirJavaClass || javaClass in processedJavaClasses) continue
+                    javaClass.accept(renderer, null)
+                    processedJavaClasses += javaClass
+                }
+            }
+        }.toString()
+        if (javaFirDump.isNotEmpty()) {
+            KotlinTestUtils.assertEqualsToFile(File("$dirPath/extraDump.java.txt"), javaFirDump)
         }
     }
 }

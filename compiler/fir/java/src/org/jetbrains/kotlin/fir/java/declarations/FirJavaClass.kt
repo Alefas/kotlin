@@ -5,7 +5,6 @@
 
 package org.jetbrains.kotlin.fir.java.declarations
 
-import com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
@@ -21,10 +20,11 @@ class FirJavaClass(
     visibility: Visibility,
     modality: Modality?,
     classKind: ClassKind,
+    isTopLevel: Boolean,
     isStatic: Boolean
 ) : FirClassImpl(
     session, psi = null, symbol = symbol, name = name,
     visibility = visibility, modality = modality,
-    isExpect = false, isActual = false, classKind = classKind, isInner = !isStatic,
+    isExpect = false, isActual = false, classKind = classKind, isInner = !isTopLevel && !isStatic,
     isCompanion = false, isData = false, isInline = false
 )

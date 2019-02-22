@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.analyzer.ModuleInfo
 import org.jetbrains.kotlin.fir.*
+import org.jetbrains.kotlin.fir.java.transformers.FirJavaTypeEnhancementTransformer
 import org.jetbrains.kotlin.fir.resolve.FirProvider
 import org.jetbrains.kotlin.fir.resolve.FirSymbolProvider
 import org.jetbrains.kotlin.fir.resolve.impl.FirCompositeSymbolProvider
@@ -20,7 +21,7 @@ class FirJavaModuleBasedSession(
     override val sessionProvider: FirProjectSessionProvider,
     scope: GlobalSearchScope,
     dependenciesProvider: FirSymbolProvider? = null
-) : FirModuleBasedSession(moduleInfo) {
+) : FirModuleBasedSession(moduleInfo), FirSessionWithTransformation {
 
     init {
         sessionProvider.sessionCache[moduleInfo] = this
@@ -42,7 +43,7 @@ class FirLibrarySession(
     moduleInfo: ModuleInfo,
     override val sessionProvider: FirProjectSessionProvider,
     scope: GlobalSearchScope
-) : FirSessionBase() {
+) : FirSessionBase(), FirSessionWithTransformation {
     init {
         sessionProvider.sessionCache[moduleInfo] = this
         registerComponent(

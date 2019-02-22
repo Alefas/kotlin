@@ -34,6 +34,11 @@ public class FirMultiModuleResolveTestGenerated extends AbstractFirMultiModuleRe
         runTest("idea/testData/fir/multiModule/basic/");
     }
 
+    @TestMetadata("basicWithAnnotatedJava")
+    public void testBasicWithAnnotatedJava() throws Exception {
+        runTest("idea/testData/fir/multiModule/basicWithAnnotatedJava/");
+    }
+
     @TestMetadata("basicWithJava")
     public void testBasicWithJava() throws Exception {
         runTest("idea/testData/fir/multiModule/basicWithJava/");

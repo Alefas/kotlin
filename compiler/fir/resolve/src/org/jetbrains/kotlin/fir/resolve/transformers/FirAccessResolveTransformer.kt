@@ -66,7 +66,7 @@ class FirAccessResolveTransformer : FirAbstractTreeTransformerWithSuperTypes(rev
                     null
                 }
             }
-        return FirClassUseSiteScope(useSiteSession, superTypeScope, declaredScope, true)
+        return FirClassUseSiteScope(useSiteSession, superTypeScope, declaredScope)
     }
 
     override fun transformRegularClass(regularClass: FirRegularClass, data: Nothing?): CompositeTransformResult<FirDeclaration> {
