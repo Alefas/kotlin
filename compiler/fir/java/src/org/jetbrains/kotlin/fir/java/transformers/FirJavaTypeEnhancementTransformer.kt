@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.transformInplaceWithBeforeOperation
 import org.jetbrains.kotlin.fir.transformSingle
 import org.jetbrains.kotlin.fir.types.ConeClassErrorType
+import org.jetbrains.kotlin.fir.types.ConeFlexibleType
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.types.FirTypeRef
 import org.jetbrains.kotlin.fir.types.impl.FirResolvedTypeRefImpl
@@ -144,8 +145,14 @@ class FirJavaTypeEnhancementTransformer(session: FirSession) : FirAbstractTreeTr
         when (this) {
             is FirResolvedTypeRef -> this
             is FirJavaTypeRef -> {
-                val coneKotlinType = (type as JavaClassifierType).toConeKotlinType(session)
-                FirResolvedTypeRefImpl(session, null, coneKotlinType, isMarkedNullable, annotations)
+                val javaType = type as JavaClassifierType
+                val upperBoundType = javaType.toConeKotlinType(session, isNullable = true)
+                val lowerBoundType = javaType.toConeKotlinType(session, isNullable = false)
+                FirResolvedTypeRefImpl(
+                    session, null, ConeFlexibleType(lowerBoundType, upperBoundType),
+                    isMarkedNullable = false,
+                    annotations = annotations
+                )
             }
             else -> error("Expected resolved type references in enhancement transformer: ${this::class.java}")
         }

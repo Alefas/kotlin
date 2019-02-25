@@ -1,4 +1,4 @@
 public open class Annotated : R|java/lang/Object| {
-    @R|org/jetbrains/annotations/NotNull|() public open operator function foo(param: R|ft<java/lang/String, java/lang/String>|!): R|ft<java/lang/String, java/lang/String>|!
+    @R|org/jetbrains/annotations/NotNull|() public open operator function foo(param: R|ft<java/lang/String, java/lang/String>|!): R|ft<java/lang/String, java/lang/String>|
 
 }
